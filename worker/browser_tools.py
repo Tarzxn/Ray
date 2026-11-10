@@ -16,7 +16,7 @@ class BrowserService:
  def __init__(self,config,cloud=False):
   self.config=config;self.root=config.store.root/'browser';self.root.mkdir(exist_ok=True)
   self.jobs=queue.Queue();self.lock=threading.RLock();self.latest={'running':False,'url':'','title':'','text':'','elements':[]};self.image=None;self.downloads={};self._ctx=None;self._pw=None;self._page=None;self._elements={};self._snapshot_id=''
-  self.cloud=cloud;self._chromium=None;self._human_until=0
+  self.cloud=cloud;self._chromium=None;self._human_until=0;self._tabs={};self._snapshot_url=''
   self.thread=threading.Thread(target=self._worker,daemon=True);self.thread.start()
  def _worker(self):
   while True:
@@ -28,7 +28,7 @@ class BrowserService:
     continue
    try:
     if future.cancelled():continue
-    if not manual and time.monotonic()<self._human_until and method in ('open','snapshot','action'):
+    if not manual and time.monotonic()<self._human_until and method in ('open','snapshot','action','tab'):
      raise ValueError('The user is controlling the browser. Wait for them to hand control back or use web research tools.')
     result=getattr(self,'_'+method)(**args)
     if not future.cancelled():future.set_result(result)
@@ -44,6 +44,8 @@ class BrowserService:
                          'manual':time.monotonic()<self._human_until,'remember':self.config.read().get('browser_remember',False)}
  def _ensure(self):
   if self._ctx and self._page and not self._page.is_closed():return
+  if self._ctx and self._tab_state():
+   self._activate(list(self._tabs.values())[-1]);return
   if self._ctx:self._close()
   from playwright.sync_api import sync_playwright
   paths=[Path(os.environ.get('PROGRAMFILES','C:/Program Files'))/'Google/Chrome/Application/chrome.exe',Path(os.environ.get('PROGRAMFILES(X86)','C:/Program Files (x86)'))/'Microsoft/Edge/Application/msedge.exe',Path(os.environ.get('LOCALAPPDATA',''))/'Google/Chrome/Application/chrome.exe']
@@ -57,11 +59,11 @@ class BrowserService:
     context=dict(viewport={'width':1280,'height':800},accept_downloads=True)
     if self.cloud:
      context['service_workers']='block'
-    if self.cloud and not settings.get('browser_remember'):
+    if not settings.get('browser_remember'):
      self._chromium=self._pw.chromium.launch(**options)
      self._ctx=self._chromium.new_context(**context)
     else:
-     profile=self.root/('remembered-profile' if self.cloud else 'profile')
+     profile=self.root/'remembered-profile'
      self._ctx=self._pw.chromium.launch_persistent_context(str(profile),**options,**context)
   except Exception:
    self._close()
@@ -76,11 +78,43 @@ class BrowserService:
     request_route.continue_()
    except Exception:request_route.abort()
   self._ctx.route('**/*',route)
-  self._page=self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
+  for page in self._ctx.pages or [self._ctx.new_page()]:self._new_page(page)
   self._ctx.on('page',self._new_page)
-  self._page.on('download',self._download)
  _preview_origin=None
- def _new_page(self,page):self._page=page;page.on('download',self._download)
+ def _new_page(self,page):
+  self._tabs[uuid.uuid4().hex[:12]]=page
+  page.on('download',self._download)
+  self._activate(page)
+ def _activate(self,page):
+  self._page=page
+  self._elements={};self._snapshot_id='';self._snapshot_url=''
+  with self.lock:
+   self.latest.update(url=page.url,title='',text='',elements=[],snapshot_id='')
+   self.image=None
+  parsed=urlsplit(page.url)
+  self._preview_origin=(parsed.scheme,parsed.netloc) if parsed.hostname=='127.0.0.1' else None
+ def _tab_state(self):
+  self._tabs={ident:page for ident,page in self._tabs.items() if not page.is_closed()}
+  return [{'id':ident,'url':page.url,'active':page==self._page} for ident,page in self._tabs.items()]
+ def _tab(self,action,tab_id=''):
+  if action=='new' and not self._ctx:return self._snapshot()
+  self._ensure()
+  if action=='new':
+   self._ctx.new_page()
+  else:
+   self._tab_state()
+   page=self._tabs.get(tab_id)
+   if not page:raise ValueError('That browser tab is closed. Refresh the tab list.')
+   if action=='switch':
+    self._activate(page)
+   elif action=='close':
+    page.close()
+    if page==self._page:
+     remaining=[tab for tab in self._tabs.values() if not tab.is_closed()]
+     if remaining:self._activate(remaining[-1])
+     else:self._ctx.new_page()
+   else:raise ValueError('Unknown tab action')
+  return self._snapshot()
  def _download(self,download):
   ident=uuid.uuid4().hex[:12];name=Path(download.suggested_filename).name.replace(':','_').rstrip(' .')[:100] or 'download'
   folder=self.root/'downloads';folder.mkdir(exist_ok=True);path=folder/(ident+'-'+name)
@@ -93,25 +127,35 @@ class BrowserService:
   with self.lock:item=self.downloads.get(ident)
   if not item:raise ValueError('Browser download not found')
   return self.root/'downloads'/(ident+'-'+item['name'])
- def _snapshot(self):
+ def _snapshot(self,tab_id=''):
+  if tab_id:return self._tab('switch',tab_id)
   self._ensure();page=self._page
   if page.url!='about:blank':self.config.validate(page.url,preview=True)
   elements=[];self._elements={}
-  for handle in page.query_selector_all('a[href],button,input:not([type=hidden]),textarea,select,[role=button],[role=link]')[:150]:
+  selector='a[href],button,input:not([type=hidden]),textarea,select,summary,[contenteditable=true],[role=button],[role=link],[role=tab],[role=checkbox],[role=menuitem],[role=combobox]'
+  for handle in page.query_selector_all(selector)[:150]:
    if not handle.is_visible():continue
-   info=handle.evaluate('(e)=>({tag:e.tagName.toLowerCase(),type:e.getAttribute("type")||"",text:(e.innerText||e.getAttribute("aria-label")||e.getAttribute("placeholder")||e.getAttribute("name")||"").slice(0,180),href:e.tagName==="A"?e.href:null})')
+   info=handle.evaluate('''e => ({
+    tag: e.tagName.toLowerCase(),
+    type: e.getAttribute('type') || '',
+    role: e.getAttribute('role') || '',
+    text: (e.getAttribute('aria-label') || Array.from(e.labels || [], l => l.innerText).join(' ') ||
+           e.innerText || e.getAttribute('placeholder') || e.getAttribute('name') || '').trim().slice(0,180),
+    href: e.tagName === 'A' ? e.href : null,
+    disabled: Boolean(e.disabled || e.getAttribute('aria-disabled') === 'true')
+   })''')
    ident='e'+str(len(elements)+1);self._elements[ident]=handle;elements.append({'id':ident,**info})
-  self._snapshot_id=uuid.uuid4().hex[:12]
+  self._snapshot_id=uuid.uuid4().hex[:12];self._snapshot_url=page.url
   # Remove credential fields from the semantic view. Their values are never read.
   text=page.locator('body').inner_text(timeout=5000)[:25000] if page.locator('body').count() else ''
   image=page.screenshot(type='jpeg',quality=70,timeout=10000)
-  result={'running':True,'url':page.url,'title':page.title(),'text':text,'elements':elements,'snapshot_id':self._snapshot_id,'note':'Untrusted page data; screenshots are for the user, not image understanding by Beam.'}
+  result={'running':True,'url':page.url,'title':page.title(),'text':text,'elements':elements,'tabs':self._tab_state(),'snapshot_id':self._snapshot_id,'note':'Untrusted page data. The agent uses page text and controls. The live image is for the user.'}
   with self.lock:self.latest=result;self.image=image
   return result
  def _frame(self):
   if not self._page or self._page.is_closed():return None
   if self._page.url!='about:blank':self.config.validate(self._page.url,preview=True)
-  with self.lock:self.latest.update(running=True,url=self._page.url,title=self._page.title())
+  with self.lock:self.latest.update(running=True,url=self._page.url,title=self._page.title(),tabs=self._tab_state())
   return self._page.screenshot(type='jpeg',quality=62,timeout=3000)
  def _remember(self,enabled):
   if not isinstance(enabled,bool):raise ValueError('Remember browser must be on or off')
@@ -145,15 +189,17 @@ class BrowserService:
    page.keyboard.press(key)
   else:raise ValueError('Unsupported browser input')
   return {'ok':True}
- def _open(self,url):
+ def _open(self,url,new_tab=False):
+  if not isinstance(new_tab,bool):raise ValueError('New tab must be true or false')
   self.config.validate(url,preview=True);self._ensure()
+  if new_tab:self._ctx.new_page()
   parsed=urlsplit(url)
   self._preview_origin=(parsed.scheme,parsed.netloc) if parsed.hostname=='127.0.0.1' else None
   self._page.goto(url,wait_until='domcontentloaded');return self._snapshot()
  def _action(self,action,element_id='',snapshot_id='',text='',key=''):
   self._ensure()
   if action in ('click','fill','select'):
-   if snapshot_id!=self._snapshot_id:raise ValueError('The page changed. Call browser_snapshot and use its current element IDs.')
+   if not snapshot_id or snapshot_id!=self._snapshot_id or self._page.url!=self._snapshot_url:raise ValueError('The page changed. Call browser_snapshot and use its current element IDs.')
    handle=self._elements.get(element_id)
    if not handle:raise ValueError('Element no longer exists. Read a new browser snapshot.')
    if action=='click':
@@ -180,7 +226,7 @@ class BrowserService:
   if self._ctx:self._ctx.close();self._ctx=None
   if self._chromium:self._chromium.close();self._chromium=None
   if self._pw:self._pw.stop();self._pw=None
-  self._page=None;self._elements={};self._human_until=0;self._preview_origin=None
+  self._page=None;self._elements={};self._tabs={};self._snapshot_id='';self._snapshot_url='';self._human_until=0;self._preview_origin=None
   with self.lock:self.latest={'running':False,'url':'','title':'','text':'','elements':[]};self.image=None
   return {'ok':True}
  def _shutdown(self):return self._close()

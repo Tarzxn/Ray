@@ -32,9 +32,9 @@ class Release4Tests(unittest.TestCase):
    status_code=200
    def __enter__(self):return self
    def __exit__(self,*args):pass
-   def iter_lines(self):yield json.dumps({'message':{'tool_calls':[{'function':{'name':'ask_user','arguments':{'question':'Which dimensions?','options':['Small','Large']}}}]},'done':True}).encode()
+   def packets(self):yield {'message':{'tool_calls':[{'function':{'name':'ask_user','arguments':{'question':'Which dimensions?','options':['Small','Large']}}}]},'done':True}
   run=Run()
-  with patch('beam_core.requests.post',return_value=Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'build a case'}],'edit','fake',run)
+  with patch('beam_core.post_chat',return_value=Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'build a case'}],'edit','fake',run)
   self.assertEqual(run.status,'waiting_input');self.assertFalse(run.snapshot()['working']);self.assertEqual(call.call_count,1);self.assertTrue(any(e['type']=='question' for e in self.store.events(self.sid)))
  def test_units_convert_without_changing_intended_size(self):
   result=self.make('inch.glb','glb',{'units':'in','tree':{'shape':'box','size':[2,1,.5]},'constraints':{'size_mm':[50.8,25.4,12.7],'tolerance_mm':.001}})

@@ -44,8 +44,8 @@ class CloudStore(Store):
         return self.cipher.decrypt(value.encode()).decode() if decrypt else self.cipher.encrypt(value.encode()).decode()
 
     def key(self):
-        saved = self.settings().get('ollama_key')
-        return self.protect_secret(saved, True) if saved else ''
+        saved = self.settings().get('groq_key')
+        return self.protect_secret(saved, True) if saved else os.environ.get('GROQ_API_KEY', '').strip()
 
     def add_project(self, raw):
         path = Path(raw).resolve(strict=True)

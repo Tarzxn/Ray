@@ -15,10 +15,10 @@ import models
 
 class RayTests(unittest.TestCase):
     def test_auto_selects_by_effort_and_only_uses_available_models(self):
-        with patch.object(models, 'live_ids', return_value={'gpt-oss:20b','qwen3.5:397b','glm-5.2'}):
-            self.assertEqual(models.route('build a server', 'low', 'fixture'), 'gpt-oss:20b')
-            self.assertEqual(models.route('build a server', 'high', 'fixture'), 'qwen3.5:397b')
-            self.assertEqual(models.route('build a server', 'max', 'fixture'), 'glm-5.2')
+        with patch.object(models, 'live_ids', return_value={'openai/gpt-oss-20b','qwen/qwen3.8-27b'}):
+            self.assertEqual(models.route('low', 'fixture'), 'openai/gpt-oss-20b')
+            self.assertEqual(models.route('high', 'fixture'), 'qwen/qwen3.8-27b')
+            self.assertEqual(models.route('max', 'fixture'), 'qwen/qwen3.8-27b')
 
     def test_always_approve_requires_review_for_sensitive_tool_args(self):
         with TemporaryDirectory() as folder:

@@ -271,3 +271,5 @@ body.crew-mode #toggle-terminal,body.crew-mode #toggle-inspector{display:none}bo
 .slash-item { padding:7px 10px; text-align:left; color:inherit; border:0; border-radius:6px; background:transparent; }
 .slash-item:hover,.slash-item:focus-visible { background:rgba(127,127,127,.16); }
 .slash-usage p { margin:.65em 0; }
+#browser-tabs{flex:1;min-width:0;padding:5px 8px;background:var(--input);border:1px solid var(--border);border-radius:6px}
+.browser-nav{display:flex;align-items:center;gap:6px;margin:0 0 10px}

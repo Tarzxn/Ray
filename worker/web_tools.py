@@ -2,6 +2,7 @@
 from __future__ import annotations
 import ipaddress
 import json
+import os
 from pathlib import Path
 import socket
 import threading
@@ -117,9 +118,9 @@ class WebTools:
   with self.lock:self.cache[key]=(time.monotonic(),result)
   return result
  def _ollama_search(self,query,count):
-  """Ollama's hosted search uses the same API key as the models. Any failure falls back to free search."""
+  """Optional Ollama search credentials are separate from the Groq model key."""
   try:
-   key=self.config.store.key()
+   key=os.environ.get('OLLAMA_API_KEY', '').strip()
    if not key:return []
    with requests.post('https://ollama.com/api/web_search',headers={'Authorization':'Bearer '+key},json={'query':query,'max_results':count},timeout=(8,25)) as response:
     if response.status_code!=200:return []

@@ -35,19 +35,19 @@ class UpgradeTests(unittest.TestCase):
    status_code=200
    def __enter__(self):return self
    def __exit__(self,*args):pass
-   def iter_lines(self):yield json.dumps({'message':{'content':'Done'},'done':True}).encode()
+   def packets(self):yield {'message':{'content':'Done'},'done':True}
   for effort in ('low','max'):
    run=Run();run.effort=effort
-   with patch('beam_core.requests.post',return_value=Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'say done'}],'plan','test',run)
+   with patch('beam_core.post_chat',return_value=Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'say done'}],'plan','test',run)
    payload=call.call_args.kwargs['json'];self.assertEqual(payload['options']['num_predict'],EFFORTS[effort]['tokens']);self.assertEqual(payload['think'],EFFORTS[effort]['think'])
  def test_repeated_failure_pauses(self):
   class Response:
    status_code=200
    def __enter__(self):return self
    def __exit__(self,*args):pass
-   def iter_lines(self):yield json.dumps({'message':{'content':'','tool_calls':[{'function':{'name':'read_file','arguments':{'path':'missing.txt'}}}]},'done':True}).encode()
+   def packets(self):yield {'message':{'content':'','tool_calls':[{'function':{'name':'read_file','arguments':{'path':'missing.txt'}}}]},'done':True}
   run=Run()
-  with patch('beam_core.requests.post',side_effect=lambda *a,**kw:Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'test'}],'plan','test',run)
+  with patch('beam_core.post_chat',side_effect=lambda *a,**kw:Response()) as call:self.agent._work(self.sid,[{'role':'user','content':'test'}],'plan','test',run)
   self.assertEqual(call.call_count,3);self.assertEqual(run.status,'needs_attention')
  @unittest.skipUnless(os.name=='nt','Windows shell')
  def test_unix_commands_and_global_kills_are_rejected(self):

@@ -25,6 +25,7 @@ _EMAIL = re.compile(r'(?<![\w.+-])[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9
 _INTENT = re.compile(r'(?i)\b(?:my|our)\s+(?:(?:public|private|local|external|internal|wi-?fi|network)\s+){0,3}(?:ip(?:v[46])?(?:\s+address)?|email(?:\s+address)?|password|api\s+key)\b')
 _SECRET_PATTERNS = tuple(re.compile(pattern, re.I if insensitive else 0) for pattern, insensitive in (
     (r'\bsk-(?:proj-|ant-api\d+-)?[A-Za-z0-9_-]{20,}', False),
+    (r'\bgsk_[A-Za-z0-9_-]{20,}', False),
     (r'\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})', False),
     (r'\bxox[baprs]-[A-Za-z0-9-]{15,}', False),
     (r'\bAIza[A-Za-z0-9_-]{30,}', False),

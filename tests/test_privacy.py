@@ -26,8 +26,8 @@ class Response:
     def __init__(self, message): self.message = message
     def __enter__(self): return self
     def __exit__(self, *args): pass
-    def iter_lines(self):
-        yield json.dumps({'message': self.message, 'done': True}).encode()
+    def packets(self):
+        yield {'message': self.message, 'done': True}
     def close(self): pass
     def json(self): return {'message': self.message, 'done': True}
     def raise_for_status(self): pass
@@ -114,16 +114,16 @@ class PrivacyTests(unittest.TestCase):
         self.assertNotIn(LOCAL_MARKER, serialized)
 
     def test_normal_coding_uses_beam_cloud_without_privacy_prompt(self):
-        with patch('beam_core.requests.post', side_effect=self.cloud):
+        with patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Create a simple Flask hello page.', 'edit')
             until(lambda: run.worker and not run.worker.is_alive())
         self.assertEqual(run.status, 'done')
         self.assertEqual(len(self.cloud_payloads), 1)
-        self.assertEqual(self.cloud_payloads[0]['model'], 'nemotron-3-super')
+        self.assertEqual(self.cloud_payloads[0]['model'], 'openai/gpt-oss-120b')
         self.assertFalse(any(e['type'] == 'privacy' for e in self.store.events(self.sid)))
 
     def test_private_user_value_gates_before_first_cloud_request(self):
-        with patch('beam_core.requests.post', side_effect=self.cloud):
+        with patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Troubleshoot my connection at ' + PRIVATE_IP, 'ask')
             pending = self.pending(run)
             self.assertEqual(self.cloud_payloads, [])
@@ -138,7 +138,7 @@ class PrivacyTests(unittest.TestCase):
         self.assertEqual(self.cloud_payloads, [])
 
     def test_personal_ip_request_gates_before_any_model_call(self):
-        with patch('beam_core.requests.post', side_effect=self.cloud):
+        with patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Find my public IP address and explain it.', 'ask')
             self.pending(run)
             self.assertEqual(self.cloud_payloads, [])
@@ -148,7 +148,7 @@ class PrivacyTests(unittest.TestCase):
 
     def test_local_summary_and_private_value_never_enter_later_cloud_turns(self):
         with patch('privacy_guard._local_json', side_effect=self.local), \
-                patch('beam_core.requests.post', side_effect=self.cloud):
+                patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Review connection details: ' + PRIVATE_IP, 'ask')
             self.assertEqual(self.local_until_done(run), 'done')
             summaries = [e for e in self.store.events(self.sid) if e['type'] == 'private_summary']
@@ -170,7 +170,7 @@ class PrivacyTests(unittest.TestCase):
                 return Response({'tool_calls': [tool('read_file', path='network.txt')]})
             return Response({'content': 'Private check completed locally.'})
         with patch('privacy_guard._local_json', side_effect=self.local), \
-                patch('beam_core.requests.post', side_effect=model):
+                patch('beam_core.post_chat', side_effect=model):
             run = self.agent.start(self.sid, 'Inspect network.txt and report completion.', 'ask')
             self.pending(run)
             self.assertEqual(len(self.cloud_payloads), 1)
@@ -183,7 +183,7 @@ class PrivacyTests(unittest.TestCase):
         def model(*args, **kwargs):
             self.cloud_payloads.append(deepcopy(kwargs['json']))
             return Response({'tool_calls': [tool('read_file', path='new-contact.txt')]})
-        with patch('beam_core.requests.post', side_effect=model):
+        with patch('beam_core.post_chat', side_effect=model):
             run = self.agent.start(self.sid, 'Check connection ' + PRIVATE_IP, 'ask')
             first = self.pending(run)
             self.agent.choose_privacy(self.sid, first['action_id'], 'cloud')
@@ -200,7 +200,7 @@ class PrivacyTests(unittest.TestCase):
         self.assertEqual(run.status, 'stopped')
 
     def test_stale_privacy_decision_is_rejected(self):
-        with patch('beam_core.requests.post', side_effect=self.cloud):
+        with patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Connection details: ' + PRIVATE_IP, 'ask')
             pending = self.pending(run)
             with self.assertRaises(ValueError):
@@ -216,7 +216,7 @@ class PrivacyTests(unittest.TestCase):
         def no_models(method, path, payload=None, timeout=None, **kwargs):
             return {'models': []}
         with patch('privacy_guard._local_json', side_effect=no_models), \
-                patch('beam_core.requests.post', side_effect=self.cloud):
+                patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Connection details: ' + PRIVATE_IP, 'ask')
             pending = self.pending(run)
             try:
@@ -233,7 +233,7 @@ class PrivacyTests(unittest.TestCase):
             if path.endswith('/tags') or path.endswith('/show'): return self.local(method, path, payload, timeout)
             raise PrivacyPause('Local Ollama is unavailable')
         with patch('privacy_guard._local_json', side_effect=unavailable), \
-                patch('beam_core.requests.post', side_effect=self.cloud):
+                patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Connection details: ' + PRIVATE_IP, 'ask')
             pending = self.pending(run)
             try:
@@ -262,7 +262,7 @@ class PrivacyTests(unittest.TestCase):
                 return Response({'tool_calls': [tool('read_file', path='network.txt')]})
             return Response({'content': 'Private check completed locally.'})
         with patch('privacy_guard._local_json', side_effect=self.local), \
-                patch('beam_core.requests.post', side_effect=model):
+                patch('beam_core.post_chat', side_effect=model):
             task = self.crew.create_task(self.pid, {'prompt': 'Audit the project notes.', 'mode': 'ask'})
             end = time.monotonic() + 10
             seen = set()
@@ -309,7 +309,7 @@ class PrivacyTests(unittest.TestCase):
                 raise AssertionError(path)
             sid = self.store.create_session(self.pid)['id']
             with self.subTest(model=candidate), patch('privacy_guard._local_json', side_effect=aliases), \
-                    patch('beam_core.requests.post', side_effect=self.cloud):
+                    patch('beam_core.post_chat', side_effect=self.cloud):
                 run = self.agent.start(sid, 'Connection details: ' + PRIVATE_IP, 'ask')
                 pending = self.pending(run)
                 try:
@@ -335,7 +335,7 @@ class PrivacyTests(unittest.TestCase):
                 raise AssertionError('Private data reached disguised remote model')
             raise AssertionError(path)
         with patch('privacy_guard._local_json', side_effect=disguised), \
-                patch('beam_core.requests.post', side_effect=self.cloud):
+                patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Connection details: ' + PRIVATE_IP, 'ask')
             pending = self.pending(run)
             try:
@@ -436,7 +436,7 @@ class PrivacyTests(unittest.TestCase):
         private_text = 'Never-public-private-fixture-text'
         for opening in ('[private]', '<private>'):
             sid = self.store.create_session(self.pid)['id']
-            with self.subTest(marker=opening), patch('beam_core.requests.post', side_effect=self.cloud):
+            with self.subTest(marker=opening), patch('beam_core.post_chat', side_effect=self.cloud):
                 run = self.agent.start(sid, 'Inspect this note: ' + opening + private_text, 'ask')
                 until(lambda: run.status == 'privacy' or (run.worker and not run.worker.is_alive()))
                 self.assertIn(run.status, ('privacy', 'needs_attention'))
@@ -454,7 +454,7 @@ class PrivacyTests(unittest.TestCase):
                 sid = self.store.create_session(self.pid)['id']
                 with self.subTest(value=value, punctuation=prefix + suffix), \
                         patch('privacy_guard._local_json', side_effect=self.local), \
-                        patch('beam_core.requests.post', side_effect=self.cloud):
+                        patch('beam_core.post_chat', side_effect=self.cloud):
                     run = self.agent.start(sid, 'Analyze the observed value ' + prefix + value + suffix, 'ask')
                     until(lambda: run.status == 'privacy' or (run.worker and not run.worker.is_alive()))
                     self.assertEqual(run.status, 'privacy', 'Sentence punctuation bypassed the first cloud checkpoint')
@@ -479,7 +479,7 @@ class PrivacyTests(unittest.TestCase):
                 sid = self.store.create_session(self.pid)['id']
                 with self.subTest(value=value, punctuation=prefix + suffix), \
                         patch('privacy_guard._local_json', side_effect=self.local), \
-                        patch('beam_core.requests.post', side_effect=model):
+                        patch('beam_core.post_chat', side_effect=model):
                     run = self.agent.start(sid, 'Inspect facts.txt and report completion.', 'ask')
                     until(lambda: run.status == 'privacy' or (run.worker and not run.worker.is_alive()))
                     self.assertEqual(run.status, 'privacy', 'Sentence punctuation bypassed the tool-result checkpoint')
@@ -598,7 +598,7 @@ class PrivacyApiTests(unittest.TestCase):
         self.assertEqual(self.post('privacy/settings', {'model': []}).status_code, 400)
 
     def test_pending_gate_status_api_hides_values_and_stop_releases_worker(self):
-        with patch('beam_core.requests.post') as cloud:
+        with patch('beam_core.post_chat') as cloud:
             run = self.app.agent.start(self.sid, 'Check connection: ' + PRIVATE_IP, 'ask')
             pending = until(lambda: getattr(run, 'privacy_pending', None) if run.status == 'privacy' else None)
             detail = self.get('sessions/' + self.sid)
@@ -620,7 +620,7 @@ class PrivacyApiTests(unittest.TestCase):
             self.assertEqual(cloud.call_count, 0)
 
     def test_crew_privacy_blocks_same_project_code_until_resolved(self):
-        with patch('beam_core.requests.post') as cloud:
+        with patch('beam_core.post_chat') as cloud:
             task = self.app.crew.create_task(self.pid, {'prompt': 'Check connection: ' + PRIVATE_IP, 'mode': 'ask'})
             detail = until(lambda: self.app.crew.task(task['id'])
                            if self.app.crew.task(task['id'])['task']['status'] == 'privacy' else None)

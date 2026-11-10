@@ -25,8 +25,8 @@ class Response:
     def __exit__(self, *args):
         pass
 
-    def iter_lines(self):
-        yield json.dumps({'message': self.message, 'done': True}).encode()
+    def packets(self):
+        yield {'message': self.message, 'done': True}
 
     def close(self):
         pass
@@ -115,7 +115,7 @@ class CrewTests(unittest.TestCase):
         self.crew.save_bot({'id': 'engineer', 'name': 'Morgan', 'role': 'Engineer',
                             'instructions': 'Write readable Python.', 'memory': 'Use Flask.', 'color': '#67a89a'})
         task = self.create(bot_id='engineer')
-        with patch('beam_core.requests.post', return_value=Response({'content': 'Reviewed the task.'})) as posted:
+        with patch('beam_core.post_chat', return_value=Response({'content': 'Reviewed the task.'})) as posted:
             self.crew.start_task(task['id'])
             self.finished(task['id'])
             code = self.store.create_session(self.pid)
@@ -154,7 +154,7 @@ class CrewTests(unittest.TestCase):
                     tool('write_file', path='crew-result.txt', content='finished')]})
             return Response({'content': 'Created crew-result.txt with finished.'})
         root = self.create(mode='edit')
-        with patch('beam_core.requests.post', side_effect=model) as posted:
+        with patch('beam_core.post_chat', side_effect=model) as posted:
             self.crew.start_task(root['id'])
             until(lambda: len(self.crew.state(self.pid)['tasks']) == 2)
             self.finished(root['id'])
@@ -180,14 +180,14 @@ class CrewTests(unittest.TestCase):
 
     def test_question_stops_working_and_followup_uses_same_session(self):
         task = self.create(bot_id='designer')
-        with patch('beam_core.requests.post', return_value=Response({'tool_calls': [
+        with patch('beam_core.post_chat', return_value=Response({'tool_calls': [
                 tool('ask_user', question='Which size?', options=['Small', 'Large'])]})):
             self.crew.start_task(task['id'])
             self.finished(task['id'], 'waiting_input')
         detail = self.crew.task(task['id'])
         self.assertFalse(detail['run']['working'])
         self.assertFalse(self.crew.state(self.pid)['working'])
-        with patch('beam_core.requests.post', return_value=Response({'content': 'Using Large.'})):
+        with patch('beam_core.post_chat', return_value=Response({'content': 'Using Large.'})):
             self.crew.start_task(task['id'], 'Large')
             self.finished(task['id'])
         self.assertEqual(self.current(task['id'])['session_id'], task['session_id'])
@@ -201,7 +201,7 @@ class CrewTests(unittest.TestCase):
             if any(m.get('tool_name') == 'write_file' for m in messages):
                 return Response({'content': 'The change was declined.'})
             return Response({'tool_calls': [tool('write_file', path='declined.txt', content='no')]})
-        with patch('beam_core.requests.post', side_effect=model):
+        with patch('beam_core.post_chat', side_effect=model):
             self.crew.start_task(task['id'])
             detail = until(lambda: self.crew.task(task['id']) if self.crew.task(task['id'])['pending'] else None)
             self.assertFalse(detail['run']['working'])
@@ -220,7 +220,7 @@ class CrewTests(unittest.TestCase):
         first = self.create(bot_id='engineer')
         second = self.create(bot_id='writer')
         try:
-            with patch('beam_core.requests.post', side_effect=model) as posted:
+            with patch('beam_core.post_chat', side_effect=model) as posted:
                 self.crew.start_task(first['id'])
                 self.assertTrue(held.wait(3))
                 self.crew.start_task(second['id'])
@@ -240,7 +240,7 @@ class CrewTests(unittest.TestCase):
         self.agent.runs[code['id']] = run
         task = self.create()
         # Starting Crew is allowed to queue, but never execute while Code holds the project.
-        with patch('beam_core.requests.post', return_value=Response({'content': 'Crew complete.'})) as posted:
+        with patch('beam_core.post_chat', return_value=Response({'content': 'Crew complete.'})) as posted:
             self.crew.start_task(task['id'])
             time.sleep(.2)
             self.assertEqual(posted.call_count, 0)
@@ -268,7 +268,7 @@ class CrewTests(unittest.TestCase):
         with self.store.lock, self.store.db:
             for task, state in zip(tasks, states):
                 self.store.db.execute('UPDATE crew_tasks SET status=? WHERE id=?', (state, task['id']))
-        with patch('beam_core.requests.post') as posted:
+        with patch('beam_core.post_chat') as posted:
             self.crew = Crew(self.store, self.agent)
             current = self.crew.state(self.pid)
             time.sleep(.1)
@@ -283,7 +283,7 @@ class CrewTests(unittest.TestCase):
             if any(m.get('tool_name') == 'crew_remember' for m in kwargs['json']['messages']):
                 return Response({'content': 'The proposed memory change was not applied.'})
             return Response({'tool_calls': [tool('crew_remember', text='This should not be saved.')]})
-        with patch('beam_core.requests.post', side_effect=model):
+        with patch('beam_core.post_chat', side_effect=model):
             self.crew.start_task(task['id'])
             self.finished(task['id'])
         engineer = next(b for b in self.crew.state(self.pid)['bots'] if b['id'] == 'engineer')
@@ -297,7 +297,7 @@ class CrewTests(unittest.TestCase):
             if any(m.get('tool_name') == 'crew_delegate' for m in kwargs['json']['messages']):
                 return Response({'content': 'Finishing my own task.'})
             return Response({'tool_calls': [tool('crew_delegate', bot_id='writer', title='Unrequested child', prompt='Do another task.')]})
-        with patch('beam_core.requests.post', side_effect=model):
+        with patch('beam_core.post_chat', side_effect=model):
             self.crew.start_task(task['id'])
             self.finished(task['id'])
         self.assertEqual(len(self.crew.state(self.pid)['tasks']), 1)
@@ -458,7 +458,7 @@ class CrewApiTests(unittest.TestCase):
 
     def test_generic_code_run_cannot_bypass_crew_context_and_queue(self):
         draft = self.draft()
-        with patch.object(self.app.store, 'key', return_value='fixture-key'), patch('beam_core.requests.post') as posted:
+        with patch.object(self.app.store, 'key', return_value='fixture-key'), patch('beam_core.post_chat') as posted:
             response = self.post('sessions/' + draft['session_id'] + '/run', {'prompt': 'Bypass Crew', 'mode': 'edit'})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(posted.call_count, 0)

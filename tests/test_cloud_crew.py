@@ -24,7 +24,7 @@ class Response:
     def __enter__(self):return self
     def __exit__(self,*args):pass
     def close(self):pass
-    def iter_lines(self):yield json.dumps({'message':self.message,'done':True}).encode()
+    def packets(self):yield {'message':self.message,'done':True}
 
 def tool(name,**args):return {'function':{'name':name,'arguments':args}}
 
@@ -82,17 +82,17 @@ class CloudTests(unittest.TestCase):
         def post(url,**kw):
             payloads.append(kw['json']);entered.set();release.wait(5)
             return Response({'tool_calls':[tool('write_file',path='report.txt',content='background output')]} if len(payloads)==1 else {'content':'Complete.'})
-        with patch('beam_core.requests.post',side_effect=post):
+        with patch('beam_core.post_chat',side_effect=post):
             task=self.router.create_task(self.pid,{'prompt':'Write a plain report.','bot_id':'writer','mode':'edit','effort':'low'})
             self.assertTrue(entered.wait(5));self.local.close();self.remote.close();release.set()
             until(lambda:self.call('cloud_task',{'task_id':task['id']})['task']['status']=='done')
         self.assertEqual((runner.project(self.pid)/'report.txt').read_text(),'background output')
         self.assertFalse((self.root/'local/report.txt').exists())
-        self.assertEqual(payloads[0]['model'],'nemotron-3-super');names=[t['function']['name'] for t in payloads[0]['tools']]
+        self.assertEqual(payloads[0]['model'],'openai/gpt-oss-120b');names=[t['function']['name'] for t in payloads[0]['tools']]
         self.assertNotIn('browser_open',names);self.assertNotIn('mcp_call',names);self.assertNotIn('slides_get',names)
     def test_task_ownership_and_active_disconnect_are_checked(self):
         self.enable();task=self.router.create_task(self.pid,{'prompt':'Inspect','start':False})
-        other='b'*32;self.call('cloud_enable',{'ollama_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
+        other='b'*32;self.call('cloud_enable',{'groq_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
         with self.assertRaisesRegex(ValueError,'another project'):self.call('cloud_task',{'task_id':task['id']},other)
         self.service.crew._update(task['id'],status='waiting_input')
         with self.assertRaisesRegex(ValueError,'Finish or stop'):self.cloud.disable(self.pid)
@@ -116,7 +116,7 @@ class CloudTests(unittest.TestCase):
         (runner.project(self.pid)/'network.txt').write_text(ip)
         def post(url,**kw):
             payloads.append(kw['json']);return Response({'tool_calls':[tool('read_file',path='network.txt')]} if len(payloads)==1 else {'content':'Done.'})
-        with patch('beam_core.requests.post',side_effect=post):
+        with patch('beam_core.post_chat',side_effect=post):
             task=self.router.create_task(self.pid,{'prompt':'Read the project network file.','bot_id':'engineer','mode':'edit','effort':'low'})
             detail=until(lambda:(d if (d:=self.call('cloud_task',{'task_id':task['id']}))['task']['status']=='privacy' else None))
             self.assertFalse(detail['run']['working']);self.assertEqual(len(payloads),1)

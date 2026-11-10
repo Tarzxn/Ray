@@ -146,18 +146,18 @@ class RemoteTests(unittest.TestCase):
             def __enter__(self):return self
             def __exit__(self,*args):pass
             def close(self):pass
-            def iter_lines(self):yield json.dumps({'message':self.message,'done':True}).encode()
+            def packets(self):yield {'message':self.message,'done':True}
         def post(url,**kwargs):
             payloads.append(kwargs['json'])
             return Response({'tool_calls':[{'function':{'name':'read_file','arguments':{'path':'network.txt'}}}]} if len(payloads)==1 else {'content':'Done.'})
-        with patch.object(self.store,'key',return_value='fixture'),patch('beam_core.requests.post',side_effect=post),patch.object(self.remote,'rpc_name',return_value={'content':ip+'.'}),patch.object(self.agent.privacy,'_model',return_value='local'),patch.object(self.agent.privacy,'_summarize',return_value=marker):
+        with patch.object(self.store,'key',return_value='fixture'),patch('beam_core.post_chat',side_effect=post),patch.object(self.remote,'rpc_name',return_value={'content':ip+'.'}),patch.object(self.agent.privacy,'_model',return_value='local'),patch.object(self.agent.privacy,'_summarize',return_value=marker):
             run=self.agent.start(self.sid,'Read the project file.','edit','low')
             until=time.monotonic()+5
             while not run.privacy_pending and time.monotonic()<until:time.sleep(.01)
             self.assertEqual(len(payloads),1);self.agent.choose_privacy(self.sid,run.privacy_pending['action_id'],'local','local');run.worker.join(5)
         self.assertEqual(run.status,'done');self.assertEqual(len(payloads),2)
         self.assertNotIn(ip,json.dumps(payloads));self.assertNotIn(marker,json.dumps(payloads));self.assertTrue(any(e['type']=='private_summary' for e in self.store.events(self.sid)))
-        self.assertEqual(payloads[0]['model'],'nemotron-3-super');self.assertNotIn('browser_open',[t['function']['name'] for t in payloads[0]['tools']])
+        self.assertEqual(payloads[0]['model'],'openai/gpt-oss-120b');self.assertNotIn('browser_open',[t['function']['name'] for t in payloads[0]['tools']])
 
 class RemoteApiTests(unittest.TestCase):
     def setUp(self):
