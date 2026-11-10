@@ -10,7 +10,7 @@ A personal **Studio** (chat that can use tools) and a private **Crew** of specia
 - **Slash commands** in Studio include `/plan`, `/model`, `/diff`, `/verify`, `/browser`, `/status`, and `/usage`. Usage shows completed model responses and reported tokens for the session, with a link to your Groq account limits.
 - **Live browser** shows the Codespace Chromium tab in the Browser pane. Take over to click, scroll and type, then hand control back to Ray. Closing the browser clears temporary site data. Enable **Remember website sign-ins** to keep a profile in your Codespace.
 - **CAD assemblies** support an editable model specification, measured size limits, named part exports, static clearance and overlap checks, and an exploded GLB view.
-- **Web research**: one tool runs up to four searches at once and reads the best pages. Search uses the free search provider, optional separate `OLLAMA_API_KEY` for hosted search, or Tavily when configured.
+- **Web research**: one tool runs up to four searches at once and reads the best pages. Search uses the free search provider or Tavily when configured. Groq handles model inference.
 - **Crew** runs queued tasks in the background. Up to three read-only (Plan mode) tasks can run side by side (Model dialog → Crew parallel research); anything that edits runs alone. Parallel tasks share the Groq request and token quotas.
 - Documents, spreadsheets, slides, PDFs, images, 3D/CAD models, a headless browser, MCP servers and Google Drive/Slides, all executing in the Codespace.
 
@@ -74,6 +74,10 @@ There are no Gists and no public worker ports. Each worker is bound to one GitHu
 ## Browser
 
 Open the Browser pane to watch Ray browse in Chromium. Open or switch tabs, inspect the active page and its controls, or choose **Take over** to click, type and scroll. Hand control back to resume agent browsing. The model uses page text and control descriptions, while the live image is available in the pane.
+
+## Upgrading an existing deployment
+
+Deploy the new files to Render and wait for the deploy to go live. Save any active work, stop the Codespace from GitHub, and reconnect in Ray. The new relay rejects an older worker that is still running. Paste your Groq key in Settings and test the connection. Private details can be redacted on the worker before sending the request to Groq.
 
 ## Troubleshooting
 
