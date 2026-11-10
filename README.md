@@ -4,7 +4,7 @@ A personal **Studio** (chat that can use tools) and a private **Crew** of specia
 
 ## What it can do
 
-- **Auto model selection** picks from your account's Ollama Cloud catalog using the task and effort level. Set a model manually in Studio or for each Crew specialist.
+- **Nemotron 3 Super** is the default model. Open **Model and reasoning** beside the Studio composer to choose an Ollama Cloud model or enter its ID under **Custom model**, even if it is absent from the list. Crew specialists can inherit the Studio model or use their own model ID.
 - **Effort slider** sets how hard the model thinks. High and Max also **review their own finished work** against your request and the tool results, then fix what they find (Model dialog → Self-review: Auto, Always or Off).
 - **Always approve** runs routine actions automatically. Detected sensitive inputs still require approval. Cloud prompts and tool results pass through a separate privacy checkpoint.
 - **Slash commands** in Studio include `/plan`, `/model`, `/diff`, `/verify`, `/browser`, `/status`, and `/usage`. Usage shows completed model responses and reported tokens for the session, with a link to your Ollama account limits.
@@ -49,7 +49,7 @@ When upgrading an existing Beam service, keep its URL and Render environment var
 1. Open your Render URL, **Continue with GitHub**, pick a Codespace you own and **Connect**. The first connection installs the worker, document/3D libraries and headless Chromium (several minutes). The Codespace needs Python 3, SSH and passwordless sudo, which the default Linux Codespace has.
 2. **Open project** to use an existing folder under `/workspaces`, or create a Ray workspace.
 3. **Settings → add your Ollama Cloud API key.** It is encrypted in the Codespace and never returned to the page.
-4. Choose an effort level, then work in **Ray Studio** or assign tasks in **Ray Crew**. Use **Auto** or choose a specific model beside the composer.
+4. Choose an effort level, then work in **Ray Studio** or assign tasks in **Ray Crew**. Use the model picker beside the composer to switch models. In the hosted app, **Auto** chooses an available Ollama Cloud model for the task and effort. Existing saved choices take precedence over the default.
 
 Free Codespace tip: choose the smallest 2-core machine.
 

@@ -254,7 +254,8 @@ body.crew-mode #toggle-terminal,body.crew-mode #toggle-inspector{display:none}bo
 .model-option:hover{border-color:var(--accent)}.model-option:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .model-option-main{display:flex;flex-direction:column;flex:1;min-width:0}.model-option-main small{color:var(--muted);margin-top:2px}
 .model-usage{color:var(--accent);font-size:10px;letter-spacing:1px;white-space:nowrap}.model-note{color:var(--muted);font-size:12px;margin:6px 0 0;line-height:1.45}
-#model-dialog select,.model-bot-field select{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--input);color:var(--ink)}
+#model-dialog select,#model-custom-id,.model-bot-field input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--input);color:var(--ink)}
+#model-custom-id:focus,.model-bot-field input:focus{border-color:var(--accent)}
 .model-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px}.model-bot-field{display:flex;flex-direction:column;gap:6px;margin-top:12px}.model-bot-field small{color:var(--muted)}
 .notice.reflect{border-left:3px solid var(--dim)}.notice.reflect.ok{border-left-color:var(--green);color:var(--green)}.notice.reflect.revise{border-left-color:var(--orange)}
 #mode option[value=auto]{color:var(--orange)}

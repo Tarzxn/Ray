@@ -17,6 +17,7 @@ import time
 
 from flask import Flask, jsonify, request, send_file
 from werkzeug.serving import make_server
+import models as model_catalog
 from beam_core import Agent, Store, MODEL, git_info, project_path, read_text, walk_files
 from crew import Crew
 from cloud_client import CrewRouter
@@ -76,17 +77,16 @@ def create_app(directory, token=None, cloud=False):
             key_ready=bool(store.key())
         except ValueError:
             key_ready=False
-        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=store.settings().get('model','beam'),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
+        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=store.settings().get('model',MODEL),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
                        projects=store.projects(),sessions=[s for s in store.sessions() if s['id'] not in crew.session_ids()],
                        active={k:agent.run_state(k)['status'] for k in list(agent.runs) if k not in crew.session_ids() and agent.run_state(k)['status'] in ('running','approval','privacy','stopping')})
 
     @app.get('/api/models')
     def models_list():
-        import models as model_catalog
         settings=store.settings()
         try:key=store.key()
         except ValueError:key=''
-        selected=settings.get('model','auto' if cloud else 'beam')
+        selected=settings.get('model',MODEL)
         catalog=model_catalog.catalog(key,selected)
         if cloud and selected != 'auto':
             catalog['models'].insert(0,model_catalog.meta('auto'))
@@ -103,14 +103,17 @@ def create_app(directory, token=None, cloud=False):
         import requests
         key=store.key()
         if not key: raise ValueError('Add an Ollama Cloud API key first')
+        model = store.settings().get('model', MODEL)
+        if model == model_catalog.AUTO_MODEL:
+            model = model_catalog.route('Reply with OK.', 'low', key)
         # Authenticated, minimal inference checks actual model access instead of the public tags endpoint.
         try:
             response=requests.post('https://ollama.com/api/chat',headers={'Authorization':'Bearer '+key},
-                json={'model':MODEL,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':False,'options':{'num_predict':8}},timeout=(15,60))
+                json={'model':model,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':model_catalog.think_value(model, 'low', False),'options':{'num_predict':8}},timeout=(15,60))
             if response.status_code != 200:
                 raise ValueError(f'Ollama returned HTTP {response.status_code}. Check your key, model access and quota.')
             response.raise_for_status()
-            return jsonify(ok=True,message='Connected to Beam on Ollama Cloud')
+            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Ollama Cloud')
         except requests.RequestException:
             raise ValueError('Could not connect to Ollama Cloud. Check your internet connection.') from None
 

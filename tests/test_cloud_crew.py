@@ -88,7 +88,7 @@ class CloudTests(unittest.TestCase):
             until(lambda:self.call('cloud_task',{'task_id':task['id']})['task']['status']=='done')
         self.assertEqual((runner.project(self.pid)/'report.txt').read_text(),'background output')
         self.assertFalse((self.root/'local/report.txt').exists())
-        self.assertEqual(payloads[0]['model'],'beam');names=[t['function']['name'] for t in payloads[0]['tools']]
+        self.assertEqual(payloads[0]['model'],'nemotron-3-super');names=[t['function']['name'] for t in payloads[0]['tools']]
         self.assertNotIn('browser_open',names);self.assertNotIn('mcp_call',names);self.assertNotIn('slides_get',names)
     def test_task_ownership_and_active_disconnect_are_checked(self):
         self.enable();task=self.router.create_task(self.pid,{'prompt':'Inspect','start':False})

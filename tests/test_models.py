@@ -34,7 +34,7 @@ class CatalogTests(unittest.TestCase):
     def test_clean_strips_cloud_suffix_and_rejects_junk(self):
         self.assertEqual(models.clean('gpt-oss:120b-cloud'), 'gpt-oss:120b')
         self.assertEqual(models.clean('qwen3.5:cloud'), 'qwen3.5')
-        self.assertEqual(models.clean(''), 'beam')
+        self.assertEqual(models.clean(''), 'nemotron-3-super')
         for bad in ('../etc', 'a b', 'x;rm', '-lead', 'a' * 90):
             with self.assertRaises(ValueError):
                 models.clean(bad)
@@ -54,7 +54,7 @@ class CatalogTests(unittest.TestCase):
     def test_catalog_filters_to_live_models_and_keeps_default(self):
         with patch.object(models, 'live_ids', return_value={'gpt-oss:120b', 'brand-new-model'}):
             ids = [m['id'] for m in models.catalog('key')['models']]
-        self.assertIn('beam', ids)
+        self.assertIn('nemotron-3-super', ids)
         self.assertIn('gpt-oss:120b', ids)
         self.assertIn('brand-new-model', ids)       # new cloud models appear without a code change
         self.assertNotIn('deepseek-v4-pro', ids)    # not visible to this key
@@ -334,13 +334,13 @@ class ApiTests(unittest.TestCase):
                     data = client.get('/api/models', headers=headers).get_json()
                     self.assertTrue(data['live'])
                     self.assertIn('gpt-oss:120b', [m['id'] for m in data['models']])
-                    self.assertEqual(data['selected'], 'beam')
+                    self.assertEqual(data['selected'], 'nemotron-3-super')
                     self.assertEqual(data['efforts']['max']['reflect'], 2)
-                    self.assertEqual(client.post('/api/settings', headers=headers, json={'model': 'gpt-oss:120b', 'reflection': 'off', 'crew_parallel': 2}).status_code, 200)
+                    self.assertEqual(client.post('/api/settings', headers=headers, json={'model': 'example/unlisted:latest', 'reflection': 'off', 'crew_parallel': 2}).status_code, 200)
                     again = client.get('/api/models', headers=headers).get_json()
-                    self.assertEqual((again['selected'], again['reflection'], again['crew_parallel']), ('gpt-oss:120b', 'off', 2))
+                    self.assertEqual((again['selected'], again['reflection'], again['crew_parallel']), ('example/unlisted:latest', 'off', 2))
                     self.assertEqual(again['efforts']['max']['reflect'], 0)
-                    self.assertEqual(client.get('/api/state', headers=headers).get_json()['selected_model'], 'gpt-oss:120b')
+                    self.assertEqual(client.get('/api/state', headers=headers).get_json()['selected_model'], 'example/unlisted:latest')
             finally:
                 app.crew.close()
                 app.agent.integrations.close()

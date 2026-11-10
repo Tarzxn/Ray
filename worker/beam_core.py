@@ -23,7 +23,7 @@ from privacy_guard import PrivacyGuard, PrivacyPause, detect_sensitive
 from command_policy import fingerprint,inspect_project,reusable_check
 from agent_runtime import ManagedServers, runtime_info, run_command, stop_process, validate_command
 
-MODEL = 'beam'  # Direct cloud API ID. The local Ollama CLI alias is beam:cloud.
+MODEL = model_catalog.DEFAULT_MODEL
 CHAT_URL = 'https://ollama.com/api/chat'
 SKIP_DIRS = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.idea', '.next', 'dist', 'build'}
 SECRET_NAMES = {'.env', '.env.local', '.env.production', '.npmrc', '.pypirc', 'id_rsa', 'id_ed25519', 'credentials.json'}
@@ -318,7 +318,7 @@ class Agent:
         root=Path(self.store.project(session['project_id'])['path'])
         if not root.is_dir():raise ValueError('The project folder no longer exists. Open its new location first.')
         if effort not in EFFORTS: raise ValueError('Unknown effort level')
-        model=model_catalog.clean(model or self.store.settings().get('model'), 'auto' if getattr(self.store,'cloud',False) else MODEL)
+        model=model_catalog.clean(model or self.store.settings().get('model'))
         if mode not in {'ask','edit','plan','auto'}:
             raise ValueError('Unknown permission mode')
         if not prompt.strip() or len(prompt) > 50000:

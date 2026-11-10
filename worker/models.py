@@ -12,7 +12,7 @@ import time
 
 import requests
 
-DEFAULT_MODEL = 'beam'           # original Reflection Beam alias, always kept
+DEFAULT_MODEL = 'nemotron-3-super'
 AUTO_MODEL = 'auto'
 TAGS_URL = 'https://ollama.com/api/tags'
 _VALID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$')
@@ -20,13 +20,13 @@ _VALID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$')
 # usage: 1 light · 2 medium · 3 heavy · 4 extra heavy (Ollama's own relative bands).
 # Free plans run one cloud model at a time with light usage, so lighter bands last longer.
 CURATED = [
-    {'id': 'beam', 'label': 'Beam (default)', 'note': 'Reflection Beam, the original Beam model', 'usage': 2, 'think': 'bool', 'pick': 'default'},
+    {'id': DEFAULT_MODEL, 'label': 'Nemotron 3 Super', 'note': 'Multi-agent reasoning', 'usage': 2, 'think': 'bool', 'pick': 'default'},
+    {'id': 'beam', 'label': 'Reflection Beam', 'note': 'The original Beam model', 'usage': 2, 'think': 'bool', 'pick': 'free'},
     {'id': 'gpt-oss:120b', 'label': 'GPT-OSS 120B', 'note': 'Strong reasoning and tool use; best all-round free-friendly pick', 'usage': 2, 'think': 'levels', 'pick': 'free'},
     {'id': 'gpt-oss:20b', 'label': 'GPT-OSS 20B', 'note': 'Fastest and lightest; ideal for quick chats and reviewers', 'usage': 1, 'think': 'levels', 'pick': 'free'},
     {'id': 'qwen3.5:397b', 'label': 'Qwen 3.5 397B', 'note': 'Large general and coding model', 'usage': 2, 'think': 'bool', 'pick': 'free'},
     {'id': 'deepseek-v4-flash', 'label': 'DeepSeek V4 Flash', 'note': 'Very long context, strong reasoning and code', 'usage': 2, 'think': 'bool', 'pick': 'free'},
     {'id': 'minimax-m2.7', 'label': 'MiniMax M2.7', 'note': 'Agentic coding and tool use', 'usage': 2, 'think': 'bool', 'pick': 'free'},
-    {'id': 'nemotron-3-super', 'label': 'Nemotron 3 Super', 'note': 'Multi-agent reasoning', 'usage': 2, 'think': 'bool', 'pick': 'free'},
     {'id': 'gemma4:31b', 'label': 'Gemma 4 31B', 'note': 'Compact, vision-capable generalist', 'usage': 2, 'think': 'bool', 'pick': 'free'},
     {'id': 'glm-5.2', 'label': 'GLM 5.2', 'note': 'Frontier coding and long documents', 'usage': 3, 'think': 'bool', 'pick': 'heavy'},
     {'id': 'kimi-k2.6', 'label': 'Kimi K2.6', 'note': 'Long-horizon agentic coding', 'usage': 3, 'think': 'bool', 'pick': 'heavy'},
