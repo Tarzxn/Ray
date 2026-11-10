@@ -157,6 +157,22 @@ class BrowserService:
   if self._page.url!='about:blank':self.config.validate(self._page.url,preview=True)
   with self.lock:self.latest.update(running=True,url=self._page.url,title=self._page.title(),tabs=self._tab_state())
   return self._page.screenshot(type='jpeg',quality=62,timeout=3000)
+ def _inspect(self,tab_id,x,y):
+  if self._tabs.get(tab_id) is not self._page or not self._page or self._page.is_closed():
+   raise ValueError('The active tab changed. Select the element again.')
+  if not isinstance(x,(int,float)) or not isinstance(y,(int,float)) or not (0<=x<1280 and 0<=y<800):
+   raise ValueError('Select a point inside the browser viewport')
+  self.config.validate(self._page.url,preview=True)
+  element=self._page.evaluate('''({x,y}) => {
+   const hit=document.elementFromPoint(x,y);
+   if(!hit)return null;
+   const el=hit.closest('a,button,input,textarea,select,[role],h1,h2,h3,[contenteditable]')||hit;
+   const editable=el.matches('input,textarea,select,[contenteditable]');
+   return {tag:el.tagName.toLowerCase(),role:el.getAttribute('role')||'',
+     label:(el.getAttribute('aria-label')||(editable?'':el.innerText)||'').trim().slice(0,160)};
+  }''',{'x':x,'y':y})
+  if not element:raise ValueError('No element at that point')
+  return element
  def _remember(self,enabled):
   if not isinstance(enabled,bool):raise ValueError('Remember browser must be on or off')
   if enabled!=self.config.read().get('browser_remember',False):
@@ -214,6 +230,7 @@ class BrowserService:
    if key not in ('Enter','Tab','Escape','ArrowDown','ArrowUp','PageDown','PageUp','Backspace'):raise ValueError('Unsupported browser key')
    self._page.keyboard.press(key)
   elif action=='back':self._page.go_back(wait_until='domcontentloaded')
+  elif action=='forward':self._page.go_forward(wait_until='domcontentloaded')
   elif action=='refresh':self._page.reload(wait_until='domcontentloaded')
   else:raise ValueError('Unknown browser action')
   self._page.wait_for_timeout(150)

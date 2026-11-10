@@ -18,7 +18,7 @@ import time
 from flask import Flask, jsonify, request, send_file
 from werkzeug.serving import make_server
 import models as model_catalog
-from groq_chat import CHAT_URL, post_chat
+from gateway_chat import CHAT_URL, post_chat
 from beam_core import Agent, Store, MODEL, git_info, project_path, read_text, walk_files
 from crew import Crew
 from cloud_client import CrewRouter
@@ -78,7 +78,7 @@ def create_app(directory, token=None, cloud=False):
             key_ready=bool(store.key())
         except ValueError:
             key_ready=False
-        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=model_catalog.clean(store.settings().get('model')),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
+        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=model_catalog.clean(store.settings().get('vercel_model')),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
                        projects=store.projects(),sessions=[s for s in store.sessions() if s['id'] not in crew.session_ids()],
                        active={k:agent.run_state(k)['status'] for k in list(agent.runs) if k not in crew.session_ids() and agent.run_state(k)['status'] in ('running','approval','privacy','stopping')})
 
@@ -87,7 +87,7 @@ def create_app(directory, token=None, cloud=False):
         settings=store.settings()
         try:key=store.key()
         except ValueError:key=''
-        selected=model_catalog.clean(settings.get('model'))
+        selected=model_catalog.clean(settings.get('vercel_model'))
         catalog=model_catalog.catalog(key,selected)
         if cloud and selected != 'auto':
             catalog['models'].insert(0,model_catalog.meta('auto'))
@@ -103,8 +103,8 @@ def create_app(directory, token=None, cloud=False):
     def connection():
         import requests
         key=store.key()
-        if not key: raise ValueError('Add a Groq API key first')
-        model = store.settings().get('model', MODEL)
+        if not key: raise ValueError('Add a Vercel AI Gateway API key first')
+        model = model_catalog.clean(store.settings().get('vercel_model'))
         if model == model_catalog.AUTO_MODEL:
             model = model_catalog.route('low', key)
         # Authenticated, minimal inference checks actual model access instead of the public tags endpoint.
@@ -112,10 +112,10 @@ def create_app(directory, token=None, cloud=False):
             with post_chat(CHAT_URL,headers={'Authorization':'Bearer '+key},
                 json={'model':model,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':'low','options':{'num_predict':128}},timeout=(15,60)) as response:
                 if response.status_code != 200:
-                    raise ValueError(f'Groq returned HTTP {response.status_code}. Check your key, model access and quota.')
-            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Groq')
+                    raise ValueError(f'Vercel AI Gateway returned HTTP {response.status_code}. Check your key, model access and quota.')
+            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Vercel AI Gateway')
         except requests.RequestException:
-            raise ValueError('Could not connect to Groq. Check your internet connection.') from None
+            raise ValueError('Could not connect to Vercel AI Gateway. Check your internet connection.') from None
 
     @app.post('/api/workspace')
     def workspace():
@@ -138,7 +138,7 @@ def create_app(directory, token=None, cloud=False):
     @app.post('/api/browser')
     def browser_control():
         data=request.get_json();method=data.get('method','snapshot')
-        supported = ('open','snapshot','action','tab','restart','close','control','input','remember')
+        supported = ('open','snapshot','action','tab','restart','close','control','input','remember','inspect')
         if method not in supported:raise ValueError('Unsupported browser operation')
         args=data.get('arguments',{})
         if not isinstance(args,dict) or 'manual' in args:raise ValueError('Invalid browser arguments')
@@ -460,7 +460,7 @@ class NativeBridge:
         settings=source/'settings.json'
         if settings.is_file():
             saved=json.loads(settings.read_text('utf-8'));current=store.settings()
-            for key in ('theme','groq_key'):
+            for key in ('theme','vercel_key','vercel_model'):
                 if key in saved and key not in current:current[key]=saved[key]
             store.settings_path.write_text(json.dumps(current),'utf-8')
         return {'ok':True,'sessions':len(store.sessions())}

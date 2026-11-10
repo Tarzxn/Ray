@@ -40,7 +40,8 @@ def validate_command(command):
 
 def clean_environment():
     env=os.environ.copy()
-    env.pop('GROQ_API_KEY', None)
+    env.pop('AI_GATEWAY_API_KEY', None)
+    env.pop('VERCEL_OIDC_TOKEN', None)
     if getattr(sys,'frozen',False):
         bundle=str(Path(sys._MEIPASS).resolve()).lower()
         env['PATH']=os.pathsep.join(p for p in env.get('PATH','').split(os.pathsep) if not str(Path(p).resolve()).lower().startswith(bundle))

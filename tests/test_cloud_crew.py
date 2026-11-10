@@ -63,7 +63,7 @@ class CloudTests(unittest.TestCase):
         self.transport=patch.object(self.remote,'rpc_name',side_effect=lambda name,pid,op,args,**kw:self.call(op,args,pid));self.transport.start()
     def call(self,op,args=None,pid=None):return self.service.dispatch({'project_id':pid or self.pid,'operation':op,'arguments':args or {}})
     def enable(self):
-        with patch.object(self.store,'key',return_value='ollama-test-key'),patch.object(self.remote,'cli',return_value='github-test-token'):
+        with patch.object(self.store,'key',return_value='gateway-test-key'),patch.object(self.remote,'cli',return_value='github-test-token'):
             return self.cloud.enable(self.pid,self.agent,self.local)
     def tearDown(self):
         self.transport.stop();self.local.close();self.agent.remote.close();self.agent.servers.close();self.agent.integrations.close();self.store.db.close()
@@ -74,7 +74,7 @@ class CloudTests(unittest.TestCase):
     def test_enable_state_and_credentials_stay_outside_task_folder(self):
         self.enable();state=self.router.state(self.pid)
         self.assertTrue(state['cloud']);self.assertTrue(state['trusted']);self.assertTrue(self.remote.target(self.pid)['cloud_crew'])
-        self.assertNotIn('ollama-test-key',json.dumps(state));self.assertNotIn('github-test-token',json.dumps(state))
+        self.assertNotIn('gateway-test-key',json.dumps(state));self.assertNotIn('github-test-token',json.dumps(state))
         self.assertFalse(self.service.credentials.is_relative_to(runner.project(self.pid)))
         self.cloud.disable(self.pid);self.assertFalse(self.service.credentials.exists());self.assertFalse(self.cloud.link(self.pid))
     def test_cloud_task_continues_after_desktop_services_close(self):
@@ -88,11 +88,11 @@ class CloudTests(unittest.TestCase):
             until(lambda:self.call('cloud_task',{'task_id':task['id']})['task']['status']=='done')
         self.assertEqual((runner.project(self.pid)/'report.txt').read_text(),'background output')
         self.assertFalse((self.root/'local/report.txt').exists())
-        self.assertEqual(payloads[0]['model'],'openai/gpt-oss-120b');names=[t['function']['name'] for t in payloads[0]['tools']]
+        self.assertEqual(payloads[0]['model'],'reflection/beam-free');names=[t['function']['name'] for t in payloads[0]['tools']]
         self.assertNotIn('browser_open',names);self.assertNotIn('mcp_call',names);self.assertNotIn('slides_get',names)
     def test_task_ownership_and_active_disconnect_are_checked(self):
         self.enable();task=self.router.create_task(self.pid,{'prompt':'Inspect','start':False})
-        other='b'*32;self.call('cloud_enable',{'groq_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
+        other='b'*32;self.call('cloud_enable',{'vercel_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
         with self.assertRaisesRegex(ValueError,'another project'):self.call('cloud_task',{'task_id':task['id']},other)
         self.service.crew._update(task['id'],status='waiting_input')
         with self.assertRaisesRegex(ValueError,'Finish or stop'):self.cloud.disable(self.pid)
@@ -111,7 +111,7 @@ class CloudTests(unittest.TestCase):
         self.cloud.task(task['id']);self.remote.paused.add('fixture-codespace');self.cloud.survey['fixture-codespace']=time.monotonic()+60
         state=self.cloud.state(self.pid);detail=self.cloud.task(task['id'])
         self.assertTrue(state['disconnected']);self.assertTrue(detail['disconnected']);self.assertFalse(detail['run']['working']);self.assertIsNone(detail['pending'])
-    def test_cloud_privacy_waits_then_redacts_before_groq(self):
+    def test_cloud_privacy_waits_then_redacts_before_vercel(self):
         self.enable();ip='10.33.45.67';payloads=[]
         (runner.project(self.pid)/'network.txt').write_text(ip)
         def post(url,**kw):

@@ -106,7 +106,7 @@ class PrivacyTests(unittest.TestCase):
             until(lambda: run.worker and not run.worker.is_alive())
         self.assertEqual(run.status, 'done')
         self.assertEqual(len(self.cloud_payloads), 1)
-        self.assertEqual(self.cloud_payloads[0]['model'], 'openai/gpt-oss-120b')
+        self.assertEqual(self.cloud_payloads[0]['model'], 'reflection/beam-free')
         self.assertFalse(any(e['type'] == 'privacy' for e in self.store.events(self.sid)))
 
     def test_private_user_value_gates_before_first_cloud_request(self):
@@ -133,7 +133,7 @@ class PrivacyTests(unittest.TestCase):
             run.worker.join(2)
         self.assertEqual(run.status, 'stopped')
 
-    def test_redaction_never_sends_private_values_to_groq(self):
+    def test_redaction_never_sends_private_values_to_vercel(self):
         with patch('requests.Session', side_effect=AssertionError('Redaction opened an HTTP session')), \
                 patch('beam_core.post_chat', side_effect=self.cloud):
             run = self.agent.start(self.sid, 'Review connection details: ' + PRIVATE_IP, 'ask')

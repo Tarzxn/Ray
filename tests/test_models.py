@@ -34,16 +34,16 @@ class CatalogTests(unittest.TestCase):
     def test_clean_strips_cloud_suffix_and_rejects_junk(self):
         self.assertEqual(models.clean('gpt-oss:120b-cloud'), 'openai/gpt-oss-120b')
         self.assertEqual(models.clean('qwen3.5:cloud'), 'qwen3.5')
-        self.assertEqual(models.clean(''), 'openai/gpt-oss-120b')
+        self.assertEqual(models.clean(''), 'reflection/beam-free')
         for bad in ('../etc', 'a b', 'x;rm', '-lead', 'a' * 90):
             with self.assertRaises(ValueError):
                 models.clean(bad)
 
-    def test_think_levels_for_gpt_oss_and_booleans_elsewhere(self):
+    def test_think_levels_for_supported_models(self):
         self.assertEqual(models.think_value('openai/gpt-oss-120b', 'max', True), 'high')
         self.assertEqual(models.think_value('openai/gpt-oss-120b', 'low', True), 'low')
         self.assertEqual(models.think_value('openai/gpt-oss-20b', 'low', False), 'low')   # cannot be fully disabled
-        self.assertEqual(models.think_value('qwen/qwen3.8-27b', 'high', True), 'high')
+        self.assertEqual(models.think_value('reflection/beam-free', 'high', True), 'high')
         self.assertIsNone(models.think_value('unknown/model', 'low', False))
 
     def test_reflection_rounds_follow_effort_and_setting(self):
@@ -52,15 +52,15 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(models.reflect_rounds('low', {'reflection': 'always'}), 1)
 
     def test_catalog_filters_to_live_models_and_keeps_default(self):
-        with patch.object(models, 'live_ids', return_value={'openai/gpt-oss-120b', 'brand-new-model'}):
+        with patch.object(models, 'live_models', return_value={name: models.meta(name) for name in ('openai/gpt-oss-120b', 'brand-new-model')}):
             ids = [m['id'] for m in models.catalog('key')['models']]
-        self.assertIn('openai/gpt-oss-120b', ids)
+        self.assertIn('reflection/beam-free', ids)
         self.assertIn('openai/gpt-oss-120b', ids)
         self.assertIn('brand-new-model', ids)       # new cloud models appear without a code change
         self.assertNotIn('deepseek-v4-pro', ids)    # not visible to this key
 
     def test_catalog_falls_back_to_curated_when_offline(self):
-        with patch.object(models, 'live_ids', return_value=None):
+        with patch.object(models, 'live_models', return_value=None):
             result = models.catalog('key')
         self.assertFalse(result['live'])
         self.assertGreaterEqual(len(result['models']), 3)
@@ -87,7 +87,7 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(run.worker.is_alive())
         return run
 
-    def test_selected_model_and_thinking_reach_ollama(self):
+    def test_selected_model_and_thinking_reach_gateway(self):
         with patch('beam_core.post_chat', return_value=Reply({'content': 'Hi there.'})) as posted:
             self.agent.start(self.sid, 'hello', 'plan', 'high', model='gpt-oss:120b-cloud')
             run = self.wait()
@@ -155,7 +155,7 @@ class AgentTests(unittest.TestCase):
             self.store.save_settings({'crew_parallel': 9})
         self.store.save_settings({'crew_parallel': 2, 'reflection': 'always', 'model': 'openai/gpt-oss-20b'})
         saved = self.store.settings()
-        self.assertEqual((saved['crew_parallel'], saved['reflection'], saved['model']), (2, 'always', 'openai/gpt-oss-20b'))
+        self.assertEqual((saved['crew_parallel'], saved['reflection'], saved['vercel_model']), (2, 'always', 'openai/gpt-oss-20b'))
 
     def _run_tools(self, mode, calls):
         replies = [Reply({'tool_calls': calls}), Reply({'content': 'Finished.'})]
@@ -323,11 +323,11 @@ class ApiTests(unittest.TestCase):
             headers = {'X-Beam-Token': 'fixture-token'}
             client = app.test_client()
             try:
-                with patch.object(app.store, 'key', return_value='k'), patch.object(models, 'live_ids', return_value={'openai/gpt-oss-120b'}):
+                with patch.object(app.store, 'key', return_value='k'), patch.object(models, 'live_models', return_value={'openai/gpt-oss-120b': models.meta('openai/gpt-oss-120b')}):
                     data = client.get('/api/models', headers=headers).get_json()
                     self.assertTrue(data['live'])
                     self.assertIn('openai/gpt-oss-120b', [m['id'] for m in data['models']])
-                    self.assertEqual(data['selected'], 'openai/gpt-oss-120b')
+                    self.assertEqual(data['selected'], 'reflection/beam-free')
                     self.assertEqual(data['efforts']['max']['reflect'], 2)
                     self.assertEqual(client.post('/api/settings', headers=headers, json={'model': 'example/unlisted:latest', 'reflection': 'off', 'crew_parallel': 2}).status_code, 200)
                     again = client.get('/api/models', headers=headers).get_json()

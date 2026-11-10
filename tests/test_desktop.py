@@ -105,7 +105,7 @@ class DesktopTests(unittest.TestCase):
                 if run.status=='done':break
                 time.sleep(.01)
         self.assertEqual(run.status,'done');self.assertEqual((self.project/'app.py').read_text(),'value = 2\n')
-        self.assertEqual(posted.call_args_list[0].kwargs['json']['model'],'openai/gpt-oss-120b')
+        self.assertEqual(posted.call_args_list[0].kwargs['json']['model'],'reflection/beam-free')
         self.assertTrue(any(e['type']=='change' for e in self.app.store.events(self.s)))
         self.assertEqual(self.app.store.session(self.s)['messages'][-1]['content'],'Updated the value to 2.')
     def test_stop_between_calls_keeps_valid_history(self):
