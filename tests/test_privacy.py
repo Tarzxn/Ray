@@ -106,7 +106,7 @@ class PrivacyTests(unittest.TestCase):
             until(lambda: run.worker and not run.worker.is_alive())
         self.assertEqual(run.status, 'done')
         self.assertEqual(len(self.cloud_payloads), 1)
-        self.assertEqual(self.cloud_payloads[0]['model'], 'reflection/beam-free')
+        self.assertEqual(self.cloud_payloads[0]['model'], 'nemotron-3-super')
         self.assertFalse(any(e['type'] == 'privacy' for e in self.store.events(self.sid)))
 
     def test_private_user_value_gates_before_first_cloud_request(self):

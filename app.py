@@ -89,12 +89,12 @@ def prepare_tools():
     temporary.write_bytes(executable); temporary.chmod(0o755); temporary.replace(tool)
     return str(tool)
 
-WORKER_VERSION = '0.9.2-vercel'
+WORKER_VERSION = '0.9.4-ollama'
 
 
-def require_vercel_worker(result):
-    if result.get('version') != WORKER_VERSION or result.get('inference_provider') != 'vercel':
-        raise ValueError('An older worker is still running. Save your work, stop this Codespace in GitHub, then reconnect to load the Vercel AI Gateway worker.')
+def require_ollama_worker(result):
+    if result.get('version') != WORKER_VERSION or result.get('inference_provider') != 'ollama':
+        raise ValueError('An older worker is still running. Save your work, stop this Codespace in GitHub, then reconnect to load the Ollama Cloud worker.')
 
 
 class Transport:
@@ -142,7 +142,7 @@ class Transport:
                     continue
                 if 'error' in packet: raise ValueError(packet['error'])
                 if packet.get('result', {}).get('ready'):
-                    require_vercel_worker(packet['result'])
+                    require_ollama_worker(packet['result'])
                     break
                 if time.monotonic() > deadline: raise ValueError('Codespace setup timed out; reconnect to retry')
             self.status, self.message = 'ready', 'Connected. Your workspace is stored in this Codespace.'

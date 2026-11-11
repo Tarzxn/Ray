@@ -22,10 +22,10 @@ CONFIG = {'BEAM_SESSION_KEY': SECRET, 'GITHUB_CLIENT_ID': 'id', 'GITHUB_CLIENT_S
 class WorkerProviderTests(unittest.TestCase):
     def test_relay_rejects_the_old_worker_and_requires_vercel(self):
         for result in ({'version': '0.9.0-cloud'}, {'version': gateway.WORKER_VERSION},
-                       {'version': gateway.WORKER_VERSION, 'inference_provider': 'ollama'}):
+                       {'version': gateway.WORKER_VERSION, 'inference_provider': 'vercel'}):
             with self.subTest(result=result), self.assertRaisesRegex(ValueError, 'older worker'):
-                gateway.require_vercel_worker(result)
-        gateway.require_vercel_worker({'version': gateway.WORKER_VERSION, 'inference_provider': 'vercel'})
+                gateway.require_ollama_worker(result)
+        gateway.require_ollama_worker({'version': gateway.WORKER_VERSION, 'inference_provider': 'ollama'})
 
 
 class FakePool:

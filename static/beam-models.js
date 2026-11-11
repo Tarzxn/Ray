@@ -2,9 +2,9 @@
 (()=>{
   const q=(s,r=document)=>r.querySelector(s);
   const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const defaultModel={id:'reflection/beam-free',label:'Beam 1.0 Free',pick:'default'};
+  const defaultModel={id:'nemotron-3-super',label:'Nemotron 3 Super',pick:'default'};
   let data=null,loading=null,choice={model:defaultModel.id,reflection:'auto',parallel:1};
-  const groups=[['default','Automatic'],['free','Free offers'],['value','Value picks'],['premium','Frontier models'],['other','More tool-capable models']];
+  const groups=[['default','Recommended'],['other','More models']];
   const label=id=>(data?.models||[defaultModel]).find(m=>m.id===id)?.label||id;
 
   async function load(force){
@@ -21,7 +21,7 @@
     el.classList.add('model-picker');el.setAttribute('role','button');el.tabIndex=0;el.title='Choose the model and reasoning';
     el.innerHTML='<span class="model-dot"></span>'+html(label(choice.model))+' <span data-icon="chevron"></span>';
     if(window.hydrateIcons)window.hydrateIcons(el);
-    const usageLabel=q('#usage');if(usageLabel)usageLabel.textContent='Vercel AI Gateway · '+label(choice.model);
+    const usageLabel=q('#usage');if(usageLabel)usageLabel.textContent='Ollama Cloud · '+label(choice.model);
     const settingsLabel=q('#settings-model-label');if(settingsLabel)settingsLabel.textContent=label(choice.model);
     const settingsId=q('#settings-model-id');if(settingsId)settingsId.textContent=choice.model;
   }
@@ -38,7 +38,7 @@
         const model=selected?.id==='model-custom'
           ? q('#model-custom-id',d).value.trim()
           : selected?.value||choice.model;
-        if(!model)throw new Error('Enter a Vercel AI Gateway model ID.');
+        if(!model)throw new Error('Enter an Ollama Cloud model ID.');
         const reflection=q('#model-reflection',d).value,crew_parallel=Number(q('#model-parallel',d).value);
         await api('settings',{model,reflection,crew_parallel});
         choice={model,reflection,parallel:crew_parallel};data=null;await load(true);d.close();
@@ -54,12 +54,12 @@
       const items=models.filter(m=>(m.pick||'other')===key);if(!items.length)return'';
       return '<div class="model-group"><h3>'+title+'</h3>'+items.map(m=>'<label class="model-option"><input type="radio" name="beam-model" value="'+html(m.id)+'"'+(m.id===choice.model?' checked':'')+'><span class="model-option-main"><b>'+html(m.label)+'</b><small>'+html(m.id)+(m.price?' · '+html(m.price):'')+'</small>'+(m.note?'<small>'+html(m.note)+'</small>':'')+'</span></label>').join('')+'</div>';
     }).join('');
-    const live=data?.live?'':'<p class="model-note">Could not reach Vercel AI Gateway to list your models; showing the usual ones.</p>';
+    const live=data?.live?'':'<p class="model-note">Could not reach Ollama Cloud to list your models; showing the usual ones.</p>';
     q('#model-body',d).innerHTML=live+
-      '<input id="model-search" type="search" aria-label="Search Vercel models" placeholder="Find a model or provider…"><p class="model-note">Free offers can expire. Other models use your Vercel AI Gateway credits.</p><div id="model-list">'+sections+'</div><p id="model-no-results" class="model-note hidden">No matching models.</p>'+
-      '<div class="model-group"><label class="model-option"><input type="radio" name="beam-model" id="model-custom"'+(customSelected?' checked':'')+'>Custom model</label><input type="text" id="model-custom-id" aria-label="Custom Vercel AI Gateway model ID" placeholder="Vercel AI Gateway model ID" autocomplete="off" spellcheck="false"><p class="model-note">Enter a model ID available to your Vercel AI Gateway account.</p></div>'+
+      '<input id="model-search" type="search" aria-label="Search Ollama models" placeholder="Find a model or provider…"><p class="model-note">Model access and usage limits depend on your Ollama Cloud plan.</p><div id="model-list">'+sections+'</div><p id="model-no-results" class="model-note hidden">No matching models.</p>'+
+      '<div class="model-group"><label class="model-option"><input type="radio" name="beam-model" id="model-custom"'+(customSelected?' checked':'')+'>Custom model</label><input type="text" id="model-custom-id" aria-label="Custom Ollama Cloud model ID" placeholder="Ollama Cloud model ID" autocomplete="off" spellcheck="false"><p class="model-note">Enter a model ID available to your Ollama Cloud account.</p></div>'+
       '<div class="model-group"><h3>Self-review</h3><select id="model-reflection"><option value="auto">Automatic (High and Max effort review their work)</option><option value="always">Always review finished work</option><option value="off">Off (fastest, lowest usage)</option></select><p class="model-note">After finishing, Ray checks its answer against your request and the tool results, then fixes problems it finds. Each review is one extra model call.</p></div>'+
-      '<div class="model-group"><h3>Crew parallel research</h3><select id="model-parallel"><option value="1">1 at a time</option><option value="2">2 read-only tasks together</option><option value="3">3 read-only tasks together</option></select><p class="model-note">Only Plan-mode tasks run side by side; anything that edits runs alone. Parallel tasks share your Vercel AI Gateway request and token limits.</p></div>';
+      '<div class="model-group"><h3>Crew parallel research</h3><select id="model-parallel"><option value="1">1 at a time</option><option value="2">2 read-only tasks together</option><option value="3">3 read-only tasks together</option></select><p class="model-note">Only Plan-mode tasks run side by side; anything that edits runs alone. Parallel tasks share your Ollama Cloud request and token limits.</p></div>';
     q('#model-reflection',d).value=choice.reflection;q('#model-parallel',d).value=String(choice.parallel);
     const custom=q('#model-custom-id',d);
     custom.value=customSelected?choice.model:'';
@@ -87,7 +87,7 @@
     let f=q('#crew-bot-model-field');if(f)return f;
     const anchor=q('#crew-bot-role');if(!anchor)return null;
     f=document.createElement('label');f.id='crew-bot-model-field';f.className='model-bot-field';
-    f.innerHTML='<span>Vercel AI Gateway model ID</span><input id="crew-bot-model" list="crew-bot-models" autocomplete="off" spellcheck="false"><datalist id="crew-bot-models"></datalist><small>Choose a suggestion or enter a model ID. Leave blank to use the Studio model.</small>';
+    f.innerHTML='<span>Ollama Cloud model ID</span><input id="crew-bot-model" list="crew-bot-models" autocomplete="off" spellcheck="false"><datalist id="crew-bot-models"></datalist><small>Choose a suggestion or enter a model ID. Leave blank to use the Studio model.</small>';
     (anchor.closest('label')||anchor).after(f);return f;
   }
   async function fillBot(bot){

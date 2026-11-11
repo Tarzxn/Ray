@@ -238,8 +238,8 @@ class RemoteComputers:
                     if 'Unknown Cloud Crew operation' not in str(error) and 'Cloud Crew is not enabled' not in str(error):
                         raise
                     provider={}
-                if provider.get('inference_provider')!='vercel':
-                    raise ValueError('Cloud Crew is running an older worker. Reinstall the Vercel AI Gateway worker, then restart the Codespace.')
+                if provider.get('inference_provider')!='ollama':
+                    raise ValueError('Cloud Crew is running an older worker. Reinstall the Ollama Cloud worker, then restart the Codespace.')
             return self._stream(argv,payload,timeout,cancelled,on_event)
         finally:self.last_use[name]=time.monotonic()
 

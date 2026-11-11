@@ -18,7 +18,7 @@ import time
 from flask import Flask, jsonify, request, send_file
 from werkzeug.serving import make_server
 import models as model_catalog
-from gateway_chat import CHAT_URL, post_chat
+from ollama_chat import CHAT_URL, post_chat
 from beam_core import Agent, Store, MODEL, git_info, project_path, read_text, walk_files
 from crew import Crew
 from cloud_client import CrewRouter
@@ -78,7 +78,7 @@ def create_app(directory, token=None, cloud=False):
             key_ready=bool(store.key())
         except ValueError:
             key_ready=False
-        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=model_catalog.clean(store.settings().get('vercel_model')),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
+        return jsonify(name='Beam',version='0.7.0',model=MODEL,configured=key_ready,theme=store.settings().get('theme','dark'),effort=store.settings().get('effort','high'),selected_model=model_catalog.clean(store.settings().get('ollama_model')),reflection=store.settings().get('reflection','auto'),crew_parallel=store.settings().get('crew_parallel',1),command_budget=store.settings().get('command_budget',8),
                        projects=store.projects(),sessions=[s for s in store.sessions() if s['id'] not in crew.session_ids()],
                        active={k:agent.run_state(k)['status'] for k in list(agent.runs) if k not in crew.session_ids() and agent.run_state(k)['status'] in ('running','approval','privacy','stopping')})
 
@@ -87,7 +87,7 @@ def create_app(directory, token=None, cloud=False):
         settings=store.settings()
         try:key=store.key()
         except ValueError:key=''
-        selected=model_catalog.clean(settings.get('vercel_model'))
+        selected=model_catalog.clean(settings.get('ollama_model'))
         catalog=model_catalog.catalog(key,selected)
         if cloud and selected != 'auto':
             catalog['models'].insert(0,model_catalog.meta('auto'))
@@ -103,19 +103,19 @@ def create_app(directory, token=None, cloud=False):
     def connection():
         import requests
         key=store.key()
-        if not key: raise ValueError('Add a Vercel AI Gateway API key first')
-        model = model_catalog.clean(store.settings().get('vercel_model'))
+        if not key: raise ValueError('Add an Ollama Cloud API key first')
+        model = model_catalog.clean(store.settings().get('ollama_model'))
         if model == model_catalog.AUTO_MODEL:
             model = model_catalog.route('low', key)
         # Authenticated, minimal inference checks actual model access instead of the public tags endpoint.
         try:
             with post_chat(CHAT_URL,headers={'Authorization':'Bearer '+key},
-                json={'model':model,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':'low','options':{'num_predict':128}},timeout=(15,60)) as response:
+                json={'model':model,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':model_catalog.think_value(model, 'low', False),'options':{'num_predict':128}},timeout=(15,60)) as response:
                 if response.status_code != 200:
-                    raise ValueError(f'Vercel AI Gateway returned HTTP {response.status_code}. Check your key, model access and quota.')
-            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Vercel AI Gateway')
+                    raise ValueError(response.error_message(model))
+            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Ollama Cloud')
         except requests.RequestException:
-            raise ValueError('Could not connect to Vercel AI Gateway. Check your internet connection.') from None
+            raise ValueError('Could not connect to Ollama Cloud. Check your internet connection.') from None
 
     @app.post('/api/workspace')
     def workspace():
@@ -460,7 +460,7 @@ class NativeBridge:
         settings=source/'settings.json'
         if settings.is_file():
             saved=json.loads(settings.read_text('utf-8'));current=store.settings()
-            for key in ('theme','vercel_key','vercel_model'):
+            for key in ('theme','ollama_key','ollama_model'):
                 if key in saved and key not in current:current[key]=saved[key]
             store.settings_path.write_text(json.dumps(current),'utf-8')
         return {'ok':True,'sessions':len(store.sessions())}

@@ -80,7 +80,7 @@ class Service:
                     return runner.command(Path(root),args,run.cancelled,on_output=lambda chunk:self.store.emit(ident,'terminal',text=chunk))
                 return super()._execute_tool(ident,run,root,mode,name,args,edit_context)
         self.agent=CloudAgent(self.store)
-        self.store.key=lambda:self.secrets().get('vercel_key','')
+        self.store.key=lambda:self.secrets().get('ollama_key','')
         self.crew=Crew(self.store,self.agent)
         self.closed=threading.Event();threading.Thread(target=self.idle,daemon=True).start()
 
@@ -103,16 +103,16 @@ class Service:
 
     def dispatch(self,request):
         pid=request['project_id'];op=request['operation'];data=request.get('arguments',{})
-        if op=='cloud_provider':return {'inference_provider':'vercel'}
+        if op=='cloud_provider':return {'inference_provider':'ollama'}
         root=self.runner.project(pid)
         if op in ('cloud_enable','cloud_create_task','cloud_start_task'):
             with self.store.lock:self.store.save_settings({'command_budget':data.get('command_budget',8)})
         if op=='cloud_enable':
-            key=data.get('vercel_key','');github=data.get('github_token','');name=data.get('codespace','')
+            key=data.get('ollama_key','');github=data.get('github_token','');name=data.get('codespace','')
             if not isinstance(key,str) or not key or len(key)>1000 or not isinstance(github,str) or not github or not re.fullmatch('[A-Za-z0-9][A-Za-z0-9-]{0,119}',name):raise ValueError('Cloud credentials or Codespace identity are missing')
             temporary=self.credentials.with_suffix('.new')
             fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
-            with os.fdopen(fd,'w') as f:json.dump({'vercel_key':key,'github_token':github},f)
+            with os.fdopen(fd,'w') as f:json.dump({'ollama_key':key,'github_token':github},f)
             os.chmod(temporary,0o600);temporary.replace(self.credentials)
             with self.store.lock,self.store.db:
                 previous=self.store.db.execute('SELECT * FROM cloud_runtime_projects WHERE project_id=?',(pid,)).fetchone()

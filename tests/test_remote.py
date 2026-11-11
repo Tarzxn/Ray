@@ -157,7 +157,7 @@ class RemoteTests(unittest.TestCase):
             self.assertEqual(len(payloads),1);self.agent.choose_privacy(self.sid,run.privacy_pending['action_id'],'local','local');run.worker.join(5)
         self.assertEqual(run.status,'done');self.assertEqual(len(payloads),2)
         self.assertNotIn(ip,json.dumps(payloads));self.assertIn('[PRIVATE_',json.dumps(payloads))
-        self.assertEqual(payloads[0]['model'],'reflection/beam-free');self.assertNotIn('browser_open',[t['function']['name'] for t in payloads[0]['tools']])
+        self.assertEqual(payloads[0]['model'],'nemotron-3-super');self.assertNotIn('browser_open',[t['function']['name'] for t in payloads[0]['tools']])
 
 class RemoteApiTests(unittest.TestCase):
     def setUp(self):

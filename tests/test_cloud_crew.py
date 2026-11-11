@@ -88,11 +88,11 @@ class CloudTests(unittest.TestCase):
             until(lambda:self.call('cloud_task',{'task_id':task['id']})['task']['status']=='done')
         self.assertEqual((runner.project(self.pid)/'report.txt').read_text(),'background output')
         self.assertFalse((self.root/'local/report.txt').exists())
-        self.assertEqual(payloads[0]['model'],'reflection/beam-free');names=[t['function']['name'] for t in payloads[0]['tools']]
+        self.assertEqual(payloads[0]['model'],'nemotron-3-super');names=[t['function']['name'] for t in payloads[0]['tools']]
         self.assertNotIn('browser_open',names);self.assertNotIn('mcp_call',names);self.assertNotIn('slides_get',names)
     def test_task_ownership_and_active_disconnect_are_checked(self):
         self.enable();task=self.router.create_task(self.pid,{'prompt':'Inspect','start':False})
-        other='b'*32;self.call('cloud_enable',{'vercel_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
+        other='b'*32;self.call('cloud_enable',{'ollama_key':'fixture','github_token':'fixture','codespace':'fixture-codespace'},other)
         with self.assertRaisesRegex(ValueError,'another project'):self.call('cloud_task',{'task_id':task['id']},other)
         self.service.crew._update(task['id'],status='waiting_input')
         with self.assertRaisesRegex(ValueError,'Finish or stop'):self.cloud.disable(self.pid)

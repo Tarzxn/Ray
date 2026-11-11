@@ -187,14 +187,17 @@ class BrowserService:
   if enabled:self._ensure()
   self._human_until=time.monotonic()+18 if enabled else 0
   return {'manual':enabled}
- def _input(self,action,x=None,y=None,text='',key='',delta=0):
+ def _input(self,action,x=None,y=None,text='',key='',delta=0,tab_id=None):
   if time.monotonic()>=self._human_until:raise ValueError('Take over the browser before sending input')
   self._control(True)
   page=self._page
-  if action in ('click','scroll'):
+  if tab_id is not None and self._tabs.get(tab_id) is not page:
+   raise ValueError('The active browser tab changed. Try again.')
+  if action in ('click','scroll','move'):
    if not isinstance(x,(int,float)) or not isinstance(y,(int,float)) or not (0<=x<1280 and 0<=y<800):
     raise ValueError('Input must be inside the browser viewport')
    if action=='click':page.mouse.click(x,y)
+   elif action=='move':page.mouse.move(x,y)
    else:page.mouse.move(x,y);page.mouse.wheel(0,max(-1600,min(1600,int(delta))))
   elif action=='text':
    if not isinstance(text,str) or len(text)>4000:raise ValueError('Enter up to 4,000 characters at once')

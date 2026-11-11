@@ -212,7 +212,7 @@ class Crew:
 
     def _require_key(self):
         if not self.store.key():
-            raise ValueError('Add your Vercel AI Gateway API key in Settings first')
+            raise ValueError('Add your Ollama Cloud API key in Settings first')
         if self._closed.is_set():
             raise ValueError('Crew is closing. Reopen Beam before starting a task.')
 

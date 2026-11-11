@@ -53,12 +53,12 @@ class CloudClient:
         if not target:raise ValueError('Connect this project to a Codespace first')
         if crew.has_pending_work() or self.remote.active(None):raise ValueError('Finish active tasks before moving Crew to the cloud')
         key=self.store.key()
-        if not key:raise ValueError('Configure the Vercel AI Gateway API key in Settings first')
+        if not key:raise ValueError('Configure the Ollama Cloud API key in Settings first')
         local=crew.state(pid);name=target['codespace'];warning='For longer background sessions, review the idle timeout in GitHub Codespaces settings. GitHub’s limits still apply.'
         local['bots']=[crew._bot(b['id']) for b in local['bots']]
         review_transfer(consent or {},{'brief':local['brief'],'profiles':[{k:b[k] for k in ('name','role','instructions','memory')} for b in local['bots']]})
         github=self.remote.cli(['auth','token','--hostname','github.com']).strip()
-        self.remote.rpc(pid,'cloud_enable',{'vercel_key':key,'github_token':github,'codespace':name,
+        self.remote.rpc(pid,'cloud_enable',{'ollama_key':key,'github_token':github,'codespace':name,
             'trusted':bool(target['trusted']),'auto_stop':bool(target['auto_stop']),
             'name':self.store.project(pid)['name'],'bots':local['bots'],'brief':local['brief'],'command_budget':self.store.settings().get('command_budget',8)},timeout=90)
         with self.store.lock,self.store.db:self.store.db.execute('INSERT OR REPLACE INTO cloud_crew_links VALUES (?,?,?)',(pid,name,1))
