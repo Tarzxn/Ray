@@ -1,12 +1,20 @@
 """Native Ollama Cloud transport for Ray's chat and self-review."""
 import json
 from contextlib import contextmanager
+from pathlib import Path
 
 import requests
 
 CHAT_URL = 'https://ollama.com/api/chat'
 MODELS_URL = 'https://ollama.com/api/tags'
 DEFAULT_MODEL = 'nemotron-3-super'
+LOCAL_MODEL = 'qwen2.5-coder:3b'
+LOCAL_CHAT_URL = 'http://127.0.0.1:11434/api/chat'
+LOCAL_FLAG = Path('/workspaces/.beam-cloud/local-inference')
+
+
+def local_enabled():
+    return LOCAL_FLAG.is_file()
 
 
 def request_payload(payload):
@@ -57,9 +65,10 @@ def stream_packets(response):
 
 
 class ChatResponse:
-    def __init__(self, response):
+    def __init__(self, response, local=False):
         self.response = response
         self.status_code = response.status_code
+        self.local = local
 
     def close(self):
         self.response.close()
@@ -71,6 +80,8 @@ class ChatResponse:
         return self.response.json()
 
     def error_message(self, model):
+        if self.local:
+            return f'Codespace model returned HTTP {self.status_code}. Check that {LOCAL_MODEL} is installed.'
         hint = {
             401: 'Check your Ollama Cloud API key in Settings.',
             402: 'Check billing and model access on your Ollama account.',
@@ -85,5 +96,18 @@ class ChatResponse:
 def post_chat(url, *, json, **kwargs):
     if url != CHAT_URL:
         raise ValueError('Unsupported inference endpoint')
+    if local_enabled():
+        payload = request_payload(json)
+        payload.update(model=LOCAL_MODEL, options={**payload.get('options', {}), 'num_ctx': 8192})
+        payload.pop('think', None)
+        kwargs.pop('headers', None)
+        with requests.Session() as session:
+            session.trust_env = False
+            try:
+                with session.post(LOCAL_CHAT_URL, json=payload, allow_redirects=False, **kwargs) as response:
+                    yield ChatResponse(response, local=True)
+            except requests.ConnectionError as error:
+                raise ValueError('The Codespace model server is offline. Start it, then retry.') from error
+        return
     with requests.post(CHAT_URL, json=request_payload(json), allow_redirects=False, **kwargs) as response:
         yield ChatResponse(response)

@@ -89,7 +89,7 @@ def prepare_tools():
     temporary.write_bytes(executable); temporary.chmod(0o755); temporary.replace(tool)
     return str(tool)
 
-WORKER_VERSION = '0.9.4-ollama'
+WORKER_VERSION = '0.9.5-inference'
 
 
 def require_ollama_worker(result):

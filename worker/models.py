@@ -6,7 +6,7 @@ import threading
 import time
 
 import requests
-from ollama_chat import DEFAULT_MODEL, MODELS_URL
+from ollama_chat import DEFAULT_MODEL, LOCAL_MODEL, MODELS_URL, local_enabled
 
 AUTO_MODEL = 'auto'
 _VALID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$')
@@ -30,6 +30,8 @@ EFFORT_PROFILES = {
 
 
 def clean(model, fallback=DEFAULT_MODEL):
+    if local_enabled():
+        return LOCAL_MODEL
     if not model:
         return fallback
     model = str(model).strip()
@@ -49,6 +51,8 @@ def meta(model):
 
 
 def route(effort, key):
+    if local_enabled():
+        return LOCAL_MODEL
     live = live_models(key)
     order = ('gpt-oss:20b', DEFAULT_MODEL, 'beam') if effort == 'low' else (DEFAULT_MODEL, 'beam', 'gpt-oss:120b', 'gpt-oss:20b')
     return next((name for name in order if live and name in live), DEFAULT_MODEL)
@@ -103,6 +107,8 @@ def live_models(key, ttl=600):
 
 
 def catalog(key=None, selected=None):
+    if local_enabled():
+        return {'models': [{'id': LOCAL_MODEL, 'label': 'Qwen2.5-Coder 3B', 'note': 'Runs inside your Codespace', 'pick': 'default'}], 'live': True}
     live = live_models(key)
     entries = [meta(AUTO_MODEL)] if selected == AUTO_MODEL else []
     for item in CURATED:

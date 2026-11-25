@@ -18,7 +18,7 @@ import time
 from flask import Flask, jsonify, request, send_file
 from werkzeug.serving import make_server
 import models as model_catalog
-from ollama_chat import CHAT_URL, post_chat
+from ollama_chat import CHAT_URL, local_enabled, post_chat
 from beam_core import Agent, Store, MODEL, git_info, project_path, read_text, walk_files
 from crew import Crew
 from cloud_client import CrewRouter
@@ -113,7 +113,8 @@ def create_app(directory, token=None, cloud=False):
                 json={'model':model,'messages':[{'role':'user','content':'Reply with OK.'}],'stream':False,'think':model_catalog.think_value(model, 'low', False),'options':{'num_predict':128}},timeout=(15,60)) as response:
                 if response.status_code != 200:
                     raise ValueError(response.error_message(model))
-            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} on Ollama Cloud')
+            location = 'in your Codespace' if local_enabled() else 'on Ollama Cloud'
+            return jsonify(ok=True,message=f'Connected to {model_catalog.meta(model)["label"]} {location}')
         except requests.RequestException:
             raise ValueError('Could not connect to Ollama Cloud. Check your internet connection.') from None
 

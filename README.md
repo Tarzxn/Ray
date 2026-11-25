@@ -1,5 +1,11 @@
 # Ray
 
+## Optional Codespace inference
+
+To use Qwen2.5-Coder 3B on the Codespace CPU, install the [Ollama Linux runtime](https://docs.ollama.com/linux) in a Codespace dedicated to Ray, then run `bash scripts/start-codespace-model.sh` there. The script starts the local runtime on loopback, downloads the model, and enables local inference after a successful chat response. No Ollama Cloud key is needed for chat in this mode.
+
+Run the script again after the Codespace restarts. Keep port 11434 private. To switch back to Ollama Cloud, remove `/workspaces/.beam-cloud/local-inference` before starting a new Ray task. Verify a streamed reply and a tool call in Studio before relying on the local model for Crew jobs.
+
 A personal **Studio** (chat that can use tools) and a private **Crew** of specialists. Everything runs in your own GitHub Codespace with your own Ollama Cloud key. The Render service is only a small sign-in and relay page.
 
 ## What it can do

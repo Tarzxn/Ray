@@ -11,8 +11,9 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from flask import jsonify, request
 from beam_core import Agent, Store
+from ollama_chat import local_enabled
 
-VERSION = '0.9.4-ollama'
+VERSION = '0.9.5-inference'
 WORKSPACES = Path('/workspaces')
 PRIVATE_NAMES = {'.beam-cloud', '.beam-crew', '.beam-worker', '.beam-projects', '.beam-cloud-runtime'}
 GRACE_SECONDS = 120
@@ -44,6 +45,8 @@ class CloudStore(Store):
         return self.cipher.decrypt(value.encode()).decode() if decrypt else self.cipher.encrypt(value.encode()).decode()
 
     def key(self):
+        if local_enabled():
+            return 'codespace-local'
         saved = self.settings().get('ollama_key')
         return self.protect_secret(saved, True) if saved else os.environ.get('OLLAMA_API_KEY', '').strip()
 
